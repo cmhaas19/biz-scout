@@ -1,36 +1,133 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# BizScout
 
-## Getting Started
+AI-powered business-for-sale sourcing and evaluation platform. BizScout scrapes listings from Kumo, scores them against your buyer profile using Claude, and surfaces the strongest acquisition matches.
 
-First, run the development server:
+## Screenshots
+
+### Dashboard
+
+Overview with last scrape status, fit score distribution, and strongest matches at a glance.
+
+![Dashboard](docs/screenshots/home.png)
+
+### Listings
+
+Full listings table with sortable columns, filters, and a slide-out detail panel showing AI analysis and financials.
+
+![Listings](docs/screenshots/listings.png)
+
+### Buyer Profile
+
+Define your acquisition criteria — target description, industries, financials, geography, and deal structure. Changes automatically mark existing evaluations as stale.
+
+![Buyer Profile](docs/screenshots/buyer-profile.png)
+
+### Scrape Logs
+
+History of all scrape and evaluation runs with real-time streaming logs when you trigger a manual scrape.
+
+![Scrape Logs](docs/screenshots/scrape-logs.png)
+
+## Tech Stack
+
+- **Framework**: Next.js 16 (App Router)
+- **Database & Auth**: Supabase (Postgres + Row Level Security)
+- **AI Evaluation**: Anthropic Claude API
+- **Data Source**: Kumo API
+- **UI**: Tailwind CSS + shadcn/ui
+- **Deployment**: Vercel
+
+## Setup
+
+### Prerequisites
+
+- Node.js 20+
+- A [Supabase](https://supabase.com) project
+- An [Anthropic API key](https://console.anthropic.com)
+- A [Kumo](https://app.withkumo.com) account
+
+### 1. Clone and install
+
+```bash
+git clone https://github.com/cmhaas19/biz-scout.git
+cd biz-scout
+npm install
+```
+
+### 2. Supabase database
+
+In your Supabase project's SQL Editor, run these files in order:
+
+1. `supabase/schema.sql`
+2. `supabase/fix_rls.sql`
+3. `supabase/eval_counts_function.sql`
+
+### 3. Environment variables
+
+Copy `.env.local.example` or create `.env.local`:
+
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ANTHROPIC_API_KEY=sk-ant-...
+CRON_SECRET=any-random-secret-string
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+```
+
+Find Supabase keys in **Project Settings > API**.
+
+### 4. Supabase auth
+
+In Supabase **Authentication > URL Configuration**:
+
+- **Site URL**: `http://localhost:3000` (or your deployed URL)
+- **Redirect URLs**: add `http://localhost:3000/callback`
+
+### 5. Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 6. First use
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+1. Sign up at `/signup`
+2. Complete your **Buyer Profile** under Setup
+3. Connect your **Kumo** account under Setup > Kumo Settings
+4. Go to **Admin > Scrape Logs** and click **Scrape Now**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy to Vercel
 
-## Learn More
+1. Push to GitHub and import the repo at [vercel.com/new](https://vercel.com/new)
+2. Add the environment variables listed above (set `NEXT_PUBLIC_APP_URL` to your Vercel URL)
+3. Deploy
+4. Update Supabase auth **Site URL** and **Redirect URLs** to match your Vercel domain
+5. The daily cron job is configured in `vercel.json` (requires Vercel Pro)
 
-To learn more about Next.js, take a look at the following resources:
+## Project Structure
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/
+  app/
+    (app)/           # Authenticated routes (sidebar layout)
+      admin/         # Admin: scrape logs, prompts, users, settings
+      listings/      # Listings table
+      setup/         # Buyer profile, Kumo connection
+    (auth)/          # Login, signup, OAuth callback
+    api/             # API routes
+  components/
+    dashboard/       # Dashboard client
+    layout/          # Sidebar, nav
+    listings/        # Listings table, detail panel
+    scrape/          # Scrape modal with streaming logs
+    profile/         # Buyer profile editor
+    ui/              # shadcn components
+  lib/
+    kumo.ts          # Kumo scraping
+    evaluator.ts     # Claude AI evaluation
+    format.ts        # Formatting utilities
+    settings.ts      # System settings with cache
+    supabase/        # Supabase client helpers
+  types/             # TypeScript interfaces
+```
