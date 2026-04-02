@@ -187,16 +187,29 @@ export async function evaluateListing(
     calibrationExamples
   );
 
-  const response = await anthropic.messages.create({
-    model,
-    max_tokens: maxTokens,
-    system: systemPrompt,
-    messages: [{ role: "user", content: userPrompt }],
-  });
+  // Retry on transient errors (429, 529, 5xx)
+  const maxRetries = 3;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      const response = await anthropic.messages.create({
+        model,
+        max_tokens: maxTokens,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
 
-  const text =
-    response.content[0].type === "text" ? response.content[0].text : "";
-  return parseEvaluationResponse(text);
+      const text =
+        response.content[0].type === "text" ? response.content[0].text : "";
+      return parseEvaluationResponse(text);
+    } catch (err: unknown) {
+      const status = (err as { status?: number }).status;
+      const isRetryable = status === 429 || status === 529 || (status != null && status >= 500);
+      if (!isRetryable || attempt === maxRetries - 1) throw err;
+      const delay = 1000 * Math.pow(2, attempt) + Math.random() * 500;
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw new Error("Unreachable");
 }
 
 export function selectCalibrationExamples(

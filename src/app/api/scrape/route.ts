@@ -94,33 +94,39 @@ async function runScrapeAndEvaluate(
 
     console.log("[scrape] Scraped", listings.length, "listings");
 
-    // Upsert listings
-    for (const listing of listings) {
-      await serviceClient.from("listings").upsert(
-        {
-          id: listing.id,
-          kumo_link: listing.kumo_link,
-          business_name: listing.business_name,
-          location: listing.location,
-          asking_price: listing.asking_price,
-          revenue: listing.revenue,
-          earnings: listing.earnings,
-          margin_pct: listing.margin_pct,
-          multiple: listing.multiple,
-          industry: listing.industry,
-          date_added: listing.date_added,
-          summary: listing.summary,
-          top_highlights: listing.top_highlights,
-          additional_information: listing.additional_information,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: "id" }
-      );
+    // Filter to net-new listings only
+    const scrapedIds = listings.map((l) => l.id);
+    const { data: existingRows } = await serviceClient
+      .from("listings")
+      .select("id")
+      .in("id", scrapedIds);
+    const existingIds = new Set((existingRows || []).map((r: { id: string }) => r.id));
+    const newListings = listings.filter((l) => !existingIds.has(l.id));
+
+    console.log("[scrape] New listings:", newListings.length, "of", listings.length);
+
+    for (const listing of newListings) {
+      await serviceClient.from("listings").insert({
+        id: listing.id,
+        kumo_link: listing.kumo_link,
+        business_name: listing.business_name,
+        location: listing.location,
+        asking_price: listing.asking_price,
+        revenue: listing.revenue,
+        earnings: listing.earnings,
+        margin_pct: listing.margin_pct,
+        multiple: listing.multiple,
+        industry: listing.industry,
+        date_added: listing.date_added,
+        summary: listing.summary,
+        top_highlights: listing.top_highlights,
+        additional_information: listing.additional_information,
+      });
     }
 
     await serviceClient
       .from("scrape_jobs")
-      .update({ listings_scraped: listings.length })
+      .update({ listings_scraped: newListings.length })
       .eq("id", jobId);
 
     // Evaluate new/un-evaluated listings
@@ -140,17 +146,7 @@ async function runScrapeAndEvaluate(
         throw new Error("No active prompt template");
       }
 
-      // Get existing evaluations for this user
-      const { data: existingEvals } = await serviceClient
-        .from("evaluations")
-        .select("listing_id")
-        .eq("user_id", profile.id);
-
-      const evaluatedIds = new Set(
-        (existingEvals || []).map((e: { listing_id: string }) => e.listing_id)
-      );
-
-      const toEvaluate = listings.filter((l) => !evaluatedIds.has(l.id));
+      const toEvaluate = newListings;
 
       // Get calibration examples
       const { data: ratedEvals } = await serviceClient

@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Markdown } from "@/components/ui/markdown";
 import { formatRelativeTime } from "@/lib/format";
 import type { PromptTemplate } from "@/types";
 
@@ -102,16 +103,16 @@ export default function AdminPromptsPage() {
             </div>
           </CardHeader>
           <CardContent>
-            <pre className="text-xs bg-muted/50 p-4 rounded-lg overflow-x-auto whitespace-pre-wrap font-mono max-h-80 overflow-y-auto">
-              {activePrompt.system_prompt}
-            </pre>
+            <div className="bg-muted/50 p-4 rounded-lg max-h-80 overflow-y-auto">
+              <Markdown content={activePrompt.system_prompt} />
+            </div>
           </CardContent>
         </Card>
       )}
 
       {/* Editor Dialog */}
       <Dialog open={editorOpen} onOpenChange={setEditorOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-5xl w-[90vw] h-[80vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>Publish New Prompt Version</DialogTitle>
           </DialogHeader>
@@ -121,37 +122,41 @@ export default function AdminPromptsPage() {
               stale.
             </AlertDescription>
           </Alert>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label>Version Name</Label>
-              <Input
-                placeholder="e.g., Scoring Rubric v3 - adjusted weights"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
+          <div className="flex flex-col gap-4 flex-1 min-h-0">
+            <div className="grid grid-cols-2 gap-4 shrink-0">
+              <div className="space-y-2">
+                <Label>Version Name</Label>
+                <Input
+                  placeholder="e.g., Scoring Rubric v3 - adjusted weights"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Notes (optional)</Label>
+                <Input
+                  placeholder="What changed in this version?"
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
+            <div className="flex flex-col flex-1 min-h-0 space-y-2">
               <Label>System Prompt</Label>
               <Textarea
-                className="font-mono text-xs min-h-[300px]"
+                className="font-mono text-xs flex-1 min-h-0 resize-none"
                 value={systemPrompt}
                 onChange={(e) => setSystemPrompt(e.target.value)}
               />
             </div>
-            <div className="space-y-2">
-              <Label>Notes (optional)</Label>
-              <Input
-                placeholder="What changed in this version?"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-              />
+            <div className="shrink-0">
+              <Button
+                onClick={publishVersion}
+                disabled={saving || !name || !systemPrompt}
+              >
+                {saving ? "Publishing..." : "Publish New Version"}
+              </Button>
             </div>
-            <Button
-              onClick={publishVersion}
-              disabled={saving || !name || !systemPrompt}
-            >
-              {saving ? "Publishing..." : "Publish New Version"}
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -206,9 +211,9 @@ export default function AdminPromptsPage() {
                 </div>
               </div>
               {expandedVersion === p.version && (
-                <pre className="text-xs bg-muted/50 p-3 rounded overflow-x-auto whitespace-pre-wrap font-mono max-h-60 overflow-y-auto">
-                  {p.system_prompt}
-                </pre>
+                <div className="bg-muted/50 p-3 rounded max-h-60 overflow-y-auto">
+                  <Markdown content={p.system_prompt} />
+                </div>
               )}
             </div>
           ))}

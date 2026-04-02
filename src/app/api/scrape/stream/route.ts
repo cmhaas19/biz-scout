@@ -116,18 +116,22 @@ export async function POST() {
 
         log(`Scrape complete: ${listings.length} listings found`);
 
-        // Check which listings already exist
-        log("Saving listings to database...");
+        // Filter to net-new listings only
+        log("Checking for new listings...");
         const listingIds = listings.map((l) => l.id);
         const { data: existingRows } = await serviceClient
           .from("listings")
           .select("id")
           .in("id", listingIds);
         const existingIds = new Set((existingRows || []).map((r: { id: string }) => r.id));
+        const newListings = listings.filter((l) => !existingIds.has(l.id));
 
-        for (const listing of listings) {
-          await serviceClient.from("listings").upsert(
-            {
+        log(`Found ${newListings.length} new listings (${existingIds.size} already in database)`);
+
+        if (newListings.length > 0) {
+          log("Saving new listings to database...");
+          for (const listing of newListings) {
+            await serviceClient.from("listings").insert({
               id: listing.id,
               kumo_link: listing.kumo_link,
               business_name: listing.business_name,
@@ -142,18 +146,13 @@ export async function POST() {
               summary: listing.summary,
               top_highlights: listing.top_highlights,
               additional_information: listing.additional_information,
-              updated_at: new Date().toISOString(),
-            },
-            { onConflict: "id" }
-          );
+            });
+          }
         }
-
-        const newCount = listings.filter((l) => !existingIds.has(l.id)).length;
-        log(`Saved: ${newCount} new, ${listings.length - newCount} updated`);
 
         await serviceClient
           .from("scrape_jobs")
-          .update({ listings_scraped: listings.length })
+          .update({ listings_scraped: newListings.length })
           .eq("id", job.id);
 
         // Evaluate
@@ -178,21 +177,7 @@ export async function POST() {
           } else {
             log(`Using prompt: "${activePrompt.name}" (v${activePrompt.version})`);
 
-            const { data: existingEvals } = await serviceClient
-              .from("evaluations")
-              .select("listing_id")
-              .eq("user_id", profile.id);
-
-            const evaluatedIds = new Set(
-              (existingEvals || []).map((e: { listing_id: string }) => e.listing_id)
-            );
-
-            const toEvaluate = listings.filter((l) => !evaluatedIds.has(l.id));
-            const skipped = listings.length - toEvaluate.length;
-
-            if (skipped > 0) {
-              log(`Skipping ${skipped} already-evaluated listings`);
-            }
+            const toEvaluate = newListings;
 
             if (toEvaluate.length === 0) {
               log("No new listings to evaluate");
