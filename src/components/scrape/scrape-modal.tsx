@@ -14,9 +14,12 @@ interface ScrapeModalProps {
   open: boolean;
   onClose: () => void;
   onComplete: () => void;
+  endpoint?: string;
+  body?: Record<string, unknown>;
+  title?: string;
 }
 
-export function ScrapeModal({ open, onClose, onComplete }: ScrapeModalProps) {
+export function ScrapeModal({ open, onClose, onComplete, endpoint = "/api/scrape/stream", body, title = "Pipeline" }: ScrapeModalProps) {
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [status, setStatus] = useState<"connecting" | "running" | "done" | "error">("connecting");
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -33,8 +36,10 @@ export function ScrapeModal({ open, onClose, onComplete }: ScrapeModalProps) {
 
     async function run() {
       try {
-        const res = await fetch("/api/scrape/stream", {
+        const res = await fetch(endpoint, {
           method: "POST",
+          headers: body ? { "Content-Type": "application/json" } : undefined,
+          body: body ? JSON.stringify(body) : undefined,
           signal: abort.signal,
         });
 
@@ -128,10 +133,10 @@ export function ScrapeModal({ open, onClose, onComplete }: ScrapeModalProps) {
     status === "connecting"
       ? "Starting..."
       : status === "running"
-        ? "Pipeline Running..."
+        ? `${title} Running...`
         : status === "done"
-          ? "Pipeline Complete"
-          : "Pipeline Failed";
+          ? `${title} Complete`
+          : `${title} Failed`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">

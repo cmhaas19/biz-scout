@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ListingDetailPanel } from "./listing-detail-panel";
+import { ScrapeModal } from "@/components/scrape/scrape-modal";
 import {
   formatCurrency,
   formatMultiple,
@@ -38,6 +39,8 @@ export function ListingsClient({ profile }: { profile: Profile }) {
   const [lastScrape, setLastScrape] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedListing, setSelectedListing] = useState<ListingWithEvaluation | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [reEvalModalOpen, setReEvalModalOpen] = useState(false);
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
   // Cleanup debounce timers on unmount
@@ -117,6 +120,23 @@ export function ListingsClient({ profile }: { profile: Profile }) {
     }
   }
 
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === listings.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(listings.map((l) => l.id)));
+    }
+  }
+
   return (
     <div className="flex flex-col h-[calc(100vh-48px)]">
       {/* Header area - fixed */}
@@ -131,7 +151,7 @@ export function ListingsClient({ profile }: { profile: Profile }) {
           </div>
         </div>
 
-        <div>
+        <div className="flex items-center gap-2">
           <Button
             variant="outline"
             size="sm"
@@ -146,6 +166,14 @@ export function ListingsClient({ profile }: { profile: Profile }) {
               </span>
             )}
           </Button>
+          {selectedIds.size > 0 && (
+            <Button
+              size="sm"
+              onClick={() => setReEvalModalOpen(true)}
+            >
+              Re-evaluate {selectedIds.size} selected
+            </Button>
+          )}
         </div>
       </div>
 
@@ -359,6 +387,14 @@ export function ListingsClient({ profile }: { profile: Profile }) {
                     <table className="w-full text-sm">
                       <thead className="sticky top-0 z-10">
                         <tr className="border-b border-gray-100 bg-gray-50/95 backdrop-blur-sm">
+                          <th className="px-4 py-2.5 w-10">
+                            <input
+                              type="checkbox"
+                              className="w-4 h-4 rounded border-gray-300 text-primary cursor-pointer"
+                              checked={listings.length > 0 && selectedIds.size === listings.length}
+                              onChange={toggleSelectAll}
+                            />
+                          </th>
                           <SortableHeader label="Fit" sortKeyName="fit_score" currentSort={sortKey} currentDir={sortDir} align="center" onSort={handleSort} />
                           <SortableHeader label="Listing" sortKeyName="business_name" currentSort={sortKey} currentDir={sortDir} align="left" onSort={handleSort} />
                           <SortableHeader label="Asking" sortKeyName="asking_price" currentSort={sortKey} currentDir={sortDir} align="right" onSort={handleSort} />
@@ -378,6 +414,14 @@ export function ListingsClient({ profile }: { profile: Profile }) {
                             className="border-b border-gray-100 last:border-0 hover:bg-gray-50/50 cursor-pointer transition-colors"
                             onClick={() => setSelectedListing(listing)}
                           >
+                            <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                className="w-4 h-4 rounded border-gray-300 text-primary cursor-pointer"
+                                checked={selectedIds.has(listing.id)}
+                                onChange={() => toggleSelect(listing.id)}
+                              />
+                            </td>
                             <td className="px-4 py-3 text-center">
                               {listing.evaluation ? (
                                 <span
@@ -527,6 +571,19 @@ export function ListingsClient({ profile }: { profile: Profile }) {
           )}
         </div>
       </div>
+
+      {/* Re-evaluate modal */}
+      <ScrapeModal
+        open={reEvalModalOpen}
+        onClose={() => setReEvalModalOpen(false)}
+        onComplete={() => {
+          setSelectedIds(new Set());
+          fetchListings();
+        }}
+        endpoint="/api/evaluations/re-evaluate/stream"
+        body={{ listing_ids: Array.from(selectedIds) }}
+        title="Re-evaluation"
+      />
 
       {/* Detail panel */}
       <ListingDetailPanel
